@@ -589,11 +589,17 @@
 }
 
 .history-item-global {
-  font-size: 0.8rem;
-  padding: 8px 0;
+  font-size: 0.75rem;
+  padding: 10px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-family: 'Courier New', Courier, monospace;
   line-height: 1.4;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .history-username {

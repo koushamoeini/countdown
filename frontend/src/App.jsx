@@ -292,10 +292,10 @@ function App() {
 
         <div className="bet-history">
           <div className="sidebar-header" style={{fontSize: '0.7rem', opacity: 0.6, marginBottom: '10px'}}>GLOBAL BETS</div>
-          {globalBets.slice(0, 20).map(bet => (
+          {globalBets.slice(0, 100).map(bet => (
             <div key={bet.id} className="history-item-global">
               <span className="history-username">{bet.username}</span> 
-              <span style={{color: '#888'}}> → </span>
+              <span style={{color: '#888'}}> bet </span>
               <span className="history-amount">${bet.amount.toLocaleString()}</span> 
               <span style={{color: '#888'}}> on </span>
               <span className="history-target">{bet.targetName}</span>
