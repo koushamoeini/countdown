@@ -11,7 +11,7 @@ const targets = [
   { id: 4, nameEn: 'Ali Shamkhani', nameFa: 'علی شمخانی', dead: false },
   { id: 5, nameEn: 'Hossein Salami', nameFa: 'حسین سلامی', dead: false },
   { id: 6, nameEn: 'Esmail Qaani', nameFa: 'اسماعیل قاآنی', dead: false },
-  { id: 7, nameEn: 'Ahmad Jannati', nameFa: 'احمد جنتی', dead: false },
+  { id: 7, nameEn: 'Ahmad Jannati', nameFa: 'احمد جنتی', dead: false, fixedDate: 'February 17, 2050 00:00:00' },
   { id: 8, nameEn: 'Mojtaba Khamenei', nameFa: 'مجتبی خامنه‌ای', dead: false },
   { id: 9, nameEn: 'Sadeq Larijani', nameFa: 'صادق لاریجانی', dead: false },
   { id: 10, nameEn: 'Mohammad Javad Zarif', nameFa: 'جواد ظریف', dead: false },
