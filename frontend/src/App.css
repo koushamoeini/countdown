@@ -662,11 +662,147 @@
 }
 
 @media (max-width: 768px) {
+  .App {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    background-attachment: scroll; /* Performance on mobile */
+  }
+
+  /* Sidebar transforms into a horizontal top bar */
+  .sidebar {
+    width: 100% !important;
+    height: auto;
+    flex-direction: column;
+    padding: 10px !important;
+    position: sticky;
+    top: 0;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 100;
+  }
+
+  .sidebar:hover {
+    width: 100% !important;
+    padding: 10px !important;
+  }
+
+  .sidebar-header {
+    display: block;
+    font-size: 0.7rem;
+    margin-bottom: 5px;
+    text-align: left;
+    opacity: 0.6;
+    border-bottom: none;
+  }
+
+  .targets-list {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 8px;
+    padding: 5px 0;
+    margin-bottom: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .target-btn {
+    flex-shrink: 0;
+    padding: 8px 12px !important;
+    min-height: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0;
+  }
+
+  .target-name {
+    opacity: 1 !important;
+    transform: none !important;
+    margin-left: 8px;
+    font-size: 0.8rem;
+  }
+
+  .status-tag {
+    opacity: 1 !important;
+    position: relative;
+    margin-left: 5px;
+  }
+
+  .creator-credit-sidebar {
+    display: none;
+  }
+
+  /* Main Content Adjustments */
+  .main-content {
+    padding: 2rem 1rem;
+    min-height: auto;
+  }
+
+  .countdown-container {
+    gap: 8px;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .countdown-item {
+    min-width: 75px;
+    padding: 0.8rem 0.4rem;
+    flex: 1 1 20%;
+  }
+
+  .count {
+    font-size: 1.6rem;
+  }
+
+  .label {
+    font-size: 0.7rem;
+  }
+
+  /* Betting Section */
   .betting-sidebar {
     width: 100%;
     border-left: none;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 1.5rem;
     height: auto;
-    max-height: 250px;
+    max-height: none;
+  }
+
+  .balance-box {
+    margin-bottom: 15px;
+    padding: 1rem;
+  }
+
+  .balance-amount {
+    font-size: 1.8rem;
+  }
+
+  .bet-card {
+    margin-bottom: 20px;
+  }
+
+  .bet-btn {
+    padding: 12px 5px; /* Larger touch area */
+    font-size: 0.8rem;
+  }
+
+  .bet-history {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .gta-bar {
+    font-size: 2rem;
+    letter-spacing: 3px;
+  }
+
+  .settle-btn {
+    padding: 10px 15px;
+    font-size: 0.8rem;
   }
 }

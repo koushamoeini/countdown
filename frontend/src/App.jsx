@@ -80,11 +80,14 @@ function App() {
       setGlobalBets(data.history)
       setResolvedStatus(data.statuses)
       
-      // Update balance if logged in
-      if (currentUser && data.balance !== null) {
-        const updatedUser = { ...currentUser, balance: data.balance }
-        setCurrentUser(updatedUser)
-        localStorage.setItem('currentUser', JSON.stringify(updatedUser))
+      // Update balance if logged in (safe update to prevent auto-login race condition)
+      if (data.balance !== null) {
+        setCurrentUser(prev => {
+          if (!prev) return null; // If user logged out during fetch, don't re-login
+          const updated = { ...prev, balance: data.balance };
+          localStorage.setItem('currentUser', JSON.stringify(updated));
+          return updated;
+        });
       }
     } catch (err) {
       console.error("Failed to fetch state", err)
@@ -295,8 +298,8 @@ function App() {
             <div className="balance-name">{currentUser.username}</div>
             <div className="balance-amount">${currentUser.balance.toLocaleString()}</div>
             <button className="logout-btn-side" onClick={() => {
-              setCurrentUser(null)
-              localStorage.removeItem('currentUser')
+              localStorage.removeItem('currentUser');
+              setCurrentUser(null);
             }}>Logout / Switch Account</button>
           </div>
         )}
