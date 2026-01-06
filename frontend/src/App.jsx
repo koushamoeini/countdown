@@ -71,16 +71,20 @@ function App() {
   // Fetch Global State (Bets & Outcomes)
   const fetchState = async () => {
     try {
-      const res = await fetch(`${API_URL}/state/`)
+      const url = currentUser 
+        ? `${API_URL}/state/?username=${currentUser.username}`
+        : `${API_URL}/state/`
+      
+      const res = await fetch(url)
       const data = await res.json()
       setGlobalBets(data.history)
       setResolvedStatus(data.statuses)
       
       // Update balance if logged in
-      if (currentUser) {
-        const userRes = await fetch(`${API_URL}/state/`, {
-          // In a real app we'd use tokens, but for now we'll just re-sync balance if user exists in context
-        })
+      if (currentUser && data.balance !== null) {
+        const updatedUser = { ...currentUser, balance: data.balance }
+        setCurrentUser(updatedUser)
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser))
       }
     } catch (err) {
       console.error("Failed to fetch state", err)
@@ -186,20 +190,6 @@ function App() {
     } catch (err) {
       alert('Settlement failed')
     }
-  }
-          if (bet.targetId === targetId && !bet.settled) {
-            const won = (bet.type === 'die' && outcome === true) || (bet.type === 'live' && outcome === false)
-            const multiplier = bet.type === 'die' ? 10 : 1.6
-            if (won) winTotal += bet.amount * multiplier
-            return { ...bet, settled: true, won }
-          }
-          return bet
-        })
-        updatedUsers[uname].balance += winTotal
-      })
-      return updatedUsers
-    })
-    setTimeout(() => window.location.reload(), 100)
   }
 
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })

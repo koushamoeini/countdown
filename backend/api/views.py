@@ -40,6 +40,7 @@ def get_global_state(request):
     history = []
     for bet in bets:
         history.append({
+            'id': bet.id,
             'username': bet.user.username,
             'targetName': bet.target_name,
             'amount': float(bet.amount),
@@ -49,9 +50,20 @@ def get_global_state(request):
     
     statuses = {s.target_id: s.is_dead for s in TargetStatus.objects.all()}
     
+    # Optional: return balance for a specific user
+    username = request.query_params.get('username')
+    balance = None
+    if username:
+        try:
+            bet_user = BetUser.objects.get(user__username=username)
+            balance = float(bet_user.balance)
+        except BetUser.DoesNotExist:
+            pass
+
     return Response({
         'history': history,
-        'statuses': statuses
+        'statuses': statuses,
+        'balance': balance
     })
 
 @api_view(['POST'])
