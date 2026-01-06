@@ -263,12 +263,6 @@ function App() {
           </div>
         </div>
         
-        <h1 className="title-farsi">
-          {isEliminated 
-            ? `${selectedTarget.nameFa} گاییده شد`
-            : `فرصت باقی مانده برای شرط بندی روی کون ${selectedTarget.nameFa}`}
-        </h1>
-        
         {isAdmin && (
           <div style={{ marginTop: '2rem', display: 'flex', gap: '10px' }}>
             <button className="settle-btn" onClick={() => settleAllBets(selectedTarget.id, true)}>Confirm DEAD</button>
@@ -331,6 +325,10 @@ function App() {
               <span style={{color: '#888'}}> bet </span>
               <span className="history-amount">${bet.amount.toLocaleString()}</span> 
               <span style={{color: '#888'}}> on </span>
+              <span style={{color: bet.type === 'die' ? '#ff4b2b' : '#4caf50', fontWeight: 'bold'}}>
+                {bet.type === 'die' ? 'DIE' : 'LIVE'}
+              </span>
+              <span style={{color: '#888'}}> for </span>
               <span className="history-target">{bet.targetName}</span>
             </div>
           ))}
