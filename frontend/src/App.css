@@ -22,6 +22,7 @@
   padding: 1rem;
   overflow-y: auto;
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .sidebar-header {
@@ -84,6 +85,7 @@
   justify-content: flex-start;
   padding-top: 15vh;
   position: relative;
+  overflow-y: auto;
 }
 
 .title-farsi {
@@ -93,14 +95,17 @@
   direction: rtl;
   text-align: center;
   width: 100%;
+  padding: 0 1rem;
 }
 
 .countdown-container {
   display: flex;
-  gap: 2.5rem;
+  gap: 2rem;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+  width: 100%;
+  padding: 0 1rem;
 }
 
 .countdown-item {
@@ -109,7 +114,7 @@
   background: rgba(0, 0, 0, 0.7);
   padding: 1.5rem;
   border-radius: 12px;
-  min-width: 120px;
+  min-width: 100px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -181,9 +186,68 @@
   font-family: Arial, sans-serif;
 }
 
-@media (max-width: 600px) {
-  .sidebar { width: 150px; }
-  .title-farsi { font-size: 2rem; }
-  .gta-bar { font-size: 2rem; letter-spacing: 5px; }
-  .creator-credit { left: 160px; }
+@media (max-width: 768px) {
+  .App {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5rem;
+  }
+
+  .sidebar-header {
+    display: none;
+  }
+
+  .target-btn {
+    white-space: nowrap;
+    margin-bottom: 0;
+    margin-right: 10px;
+    padding: 8px 12px;
+  }
+
+  .main-content {
+    padding-top: 5vh;
+    padding-bottom: 80px;
+  }
+
+  .title-farsi {
+    font-size: 2rem;
+    margin-top: 2rem;
+  }
+
+  .count {
+    font-size: 1.8rem;
+  }
+
+  .countdown-item {
+    min-width: 70px;
+    padding: 0.8rem;
+  }
+
+  .countdown-container {
+    gap: 0.5rem;
+  }
+
+  .gta-bar {
+    font-size: 2.5rem;
+    letter-spacing: 5px;
+  }
+
+  .creator-credit {
+    left: 10px;
+    bottom: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
 }
