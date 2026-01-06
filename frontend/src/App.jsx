@@ -59,63 +59,119 @@ const targets = [
 
 function App() {
   const [selectedTarget, setSelectedTarget] = useState(targets[0])
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [balance, setBalance] = useState(() => Number(localStorage.getItem('balance')) || 10000)
-  const [bets, setBets] = useState(() => JSON.parse(localStorage.getItem('bets')) || [])
-  const [betAmount, setBetAmount] = useState(100)
-  const [adminUser, setAdminUser] = useState(() => JSON.parse(localStorage.getItem('adminUser')) || null)
+  const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('betUsers')) || {})
+  const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')) || null)
+  const [globalBets, setGlobalBets] = useState(() => JSON.parse(localStorage.getItem('globalBets')) || [])
   const [loginData, setLoginData] = useState({ username: '', password: '' })
   const [resolvedStatus, setResolvedStatus] = useState(() => JSON.parse(localStorage.getItem('resolvedStatus')) || {})
+  const [betAmount, setBetAmount] = useState(100)
 
   // Sync state to localStorage
   useEffect(() => {
-    localStorage.setItem('balance', balance.toString())
-    localStorage.setItem('bets', JSON.stringify(bets))
-    localStorage.setItem('adminUser', JSON.stringify(adminUser))
+    localStorage.setItem('betUsers', JSON.stringify(users))
+    localStorage.setItem('currentUser', JSON.stringify(currentUser))
     localStorage.setItem('resolvedStatus', JSON.stringify(resolvedStatus))
-  }, [balance, bets, adminUser, resolvedStatus])
+    localStorage.setItem('globalBets', JSON.stringify(globalBets))
+  }, [users, currentUser, resolvedStatus, globalBets])
 
-  // Get effective dead status (original or admin override)
+  // Get effective dead status
   const isTargetDead = (target) => {
     if (resolvedStatus[target.id] !== undefined) return resolvedStatus[target.id]
     return target.dead
   }
 
-  // Storage for random deadlines so they remain consistent for the session
-  const deadlines = useMemo(() => {
-    const map = {}
-    // We use a FIXED reference date instead of "now" to ensure consistency across refreshes
-    const baseDate = new Date('January 1, 2026 00:00:00').getTime()
-    const maxDate = new Date('February 11, 2026 00:00:00').getTime()
-    const minDiff = 2 * 24 * 60 * 60 * 1000 // 2 days
-
-    targets.forEach(t => {
-      const isDead = isTargetDead(t)
-      if (isDead) {
-        map[t.id] = baseDate - 1000 // Already passed relative to reference
-      } else if (t.fixedDate) {
-        map[t.id] = new Date(t.fixedDate).getTime()
-      } else {
-        // Deterministic random date based on ID and the fixed baseDate
-        const seed = t.id * 86421
-        const pseudoRandom = (Math.sin(seed) + 1) / 2
-        const range = maxDate - (baseDate + minDiff)
-        map[t.id] = baseDate + minDiff + (pseudoRandom * range)
-      }
+  // Sorting targets: Alive first, then Dead
+  const sortedTargets = useMemo(() => {
+    return [...targets].sort((a, b) => {
+      const aDead = isTargetDead(a)
+      const bDead = isTargetDead(b)
+      if (aDead === bDead) return 0
+      return aDead ? 1 : -1
     })
-    return map
   }, [resolvedStatus])
+
+  // New Betting Deadline: 30 days from now (static for demo)
+  const bettingDeadline = new Date('January 31, 2026 00:00:00').getTime()
+
+  const handleLogin = (e) => {
+    e.preventDefault()
+    const { username, password } = loginData
+    if (!username || !password) return alert('Fill all fields')
+
+    const existingUser = users[username]
+    if (existingUser) {
+      if (existingUser.password === password) {
+        setCurrentUser({ username, ...existingUser })
+      } else {
+        alert('Wrong password')
+      }
+    } else {
+      const newUser = { password, balance: 10000, bets: [] }
+      setUsers(prev => ({ ...prev, [username]: newUser }))
+      setCurrentUser({ username, ...newUser })
+    }
+    setLoginData({ username: '', password: '' })
+  }
+
+  const handleBet = (type) => {
+    if (!currentUser) return alert('Please Login first')
+    if (currentUser.balance < betAmount) return alert('Not enough money!')
+    
+    const newBet = {
+      id: Date.now(),
+      username: currentUser.username,
+      targetId: selectedTarget.id,
+      targetName: selectedTarget.nameEn,
+      amount: betAmount,
+      type: type,
+      settled: false
+    }
+
+    // Update global feed
+    setGlobalBets(prev => [newBet, ...prev])
+
+    // Update user data
+    const updatedUserBets = [newBet, ...currentUser.bets]
+    const newBalance = currentUser.balance - betAmount
+    const updatedUser = { ...users[currentUser.username], balance: newBalance, bets: updatedUserBets }
+    
+    setUsers(prev => ({ ...prev, [currentUser.username]: updatedUser }))
+    setCurrentUser({ username: currentUser.username, ...updatedUser })
+  }
+
+  const settleAllBets = (targetId, outcome) => {
+    setResolvedStatus(prev => ({ ...prev, [targetId]: outcome }))
+    
+    setUsers(allUsers => {
+      const updatedUsers = { ...allUsers }
+      Object.keys(updatedUsers).forEach(uname => {
+        let winTotal = 0
+        updatedUsers[uname].bets = updatedUsers[uname].bets.map(bet => {
+          if (bet.targetId === targetId && !bet.settled) {
+            const won = (bet.type === 'die' && outcome === true) || (bet.type === 'live' && outcome === false)
+            const multiplier = bet.type === 'die' ? 10 : 1.6
+            if (won) winTotal += bet.amount * multiplier
+            return { ...bet, settled: true, won }
+          }
+          return bet
+        })
+        updatedUsers[uname].balance += winTotal
+      })
+      return updatedUsers
+    })
+    setTimeout(() => window.location.reload(), 100)
+  }
 
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
 
   useEffect(() => {
     function calculateTimeLeft() {
       const now = new Date().getTime()
-      const deadline = deadlines[selectedTarget.id]
-      const difference = deadline - now
       const isDead = isTargetDead(selectedTarget)
+      
+      const difference = isDead ? 0 : bettingDeadline - now
 
-      if (difference > 0 && !isDead) {
+      if (difference > 0) {
         return {
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
@@ -125,90 +181,35 @@ function App() {
       }
       return { days: 0, hours: 0, minutes: 0, seconds: 0 }
     }
-
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft())
-    }, 1000)
-
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000)
     setTimeLeft(calculateTimeLeft())
     return () => clearInterval(timer)
-  }, [selectedTarget, deadlines, resolvedStatus])
+  }, [selectedTarget, resolvedStatus])
 
-  const handleBet = (type) => {
-    if (balance < betAmount) return alert('Not enough money!')
-    if (betAmount <= 0) return alert('Invalid amount')
-    
-    const newBet = {
-      id: Date.now(),
-      targetId: selectedTarget.id,
-      targetName: selectedTarget.nameEn,
-      amount: betAmount,
-      type: type, // 'die' or 'live'
-      settled: false
-    }
-
-    setBalance(prev => prev - betAmount)
-    setBets(prev => [newBet, ...prev])
-  }
-
-  const handleLogin = (e) => {
-    e.preventDefault()
-    if (loginData.username === 'kousha' && loginData.password === '1234') {
-      setAdminUser({ username: 'kousha' })
-      setLoginData({ username: '', password: '' })
-    } else {
-      alert('Wrong credentials')
-    }
-  }
-
-  const settleAllBets = (targetId, outcome) => {
-    // outcome: true (dead) or false (alive)
-    setResolvedStatus(prev => ({ ...prev, [targetId]: outcome }))
-    
-    setBets(currentBets => {
-      let winTotal = 0
-      const updated = currentBets.map(bet => {
-        if (bet.targetId === targetId && !bet.settled) {
-          const won = (bet.type === 'die' && outcome === true) || (bet.type === 'live' && outcome === false)
-          const multiplier = bet.type === 'die' ? 10 : 1.6
-          if (won) {
-            winTotal += bet.amount * multiplier
-          }
-          return { ...bet, settled: true, won }
-        }
-        return bet
-      })
-      if (winTotal > 0) setBalance(prev => prev + winTotal)
-      return updated
-    })
-  }
-
-  const isEliminated = isTargetDead(selectedTarget) || (deadlines[selectedTarget.id] <= new Date().getTime())
+  const isEliminated = isTargetDead(selectedTarget)
+  const isAdmin = currentUser?.username === 'kousha'
 
   return (
     <div className="App">
       <div className="sidebar">
         <div className="sidebar-header">TARGETS</div>
         <div className="targets-list">
-          {targets.map(t => {
+          {sortedTargets.map(t => {
             const dead = isTargetDead(t)
-            const countdownEnded = deadlines[t.id] <= new Date().getTime()
-            const eliminated = dead || countdownEnded
-            
             return (
               <button 
                 key={t.id} 
-                className={`target-btn ${selectedTarget.id === t.id ? 'active' : ''} ${eliminated ? 'dead' : ''}`}
+                className={`target-btn ${selectedTarget.id === t.id ? 'active' : ''} ${dead ? 'dead' : ''}`}
                 onClick={() => setSelectedTarget(t)}
               >
                 <span className="target-name">{t.nameEn}</span>
-                {eliminated && <span className="status-tag">DONE</span>}
+                {dead && <span className="status-tag">DONE</span>}
               </button>
             )
           })}
         </div>
         <div className="creator-credit-sidebar">
-          <span className="credit-text">Created by Soheil Elahi</span>
+          <span className="credit-text">Created by Donald Trump</span>
         </div>
       </div>
 
@@ -231,9 +232,14 @@ function App() {
             <span className="label">Seconds</span>
           </div>
         </div>
-        <h1 className="title-farsi">مانده به گاییده شدن {selectedTarget.nameFa}</h1>
         
-        {adminUser && (
+        <h1 className="title-farsi">
+          {isEliminated 
+            ? `${selectedTarget.nameFa} گاییده شد`
+            : `فرصت باقی مانده برای شرط بندی روی کون ${selectedTarget.nameFa}`}
+        </h1>
+        
+        {isAdmin && (
           <div style={{ marginTop: '2rem', display: 'flex', gap: '10px' }}>
             <button className="settle-btn" onClick={() => settleAllBets(selectedTarget.id, true)}>Confirm DEAD</button>
             <button className="settle-btn" style={{background: '#4caf50'}} onClick={() => settleAllBets(selectedTarget.id, false)}>Confirm ALIVE</button>
@@ -242,14 +248,35 @@ function App() {
       </div>
 
       <div className="betting-sidebar">
-        <div className="balance-box">
-          <div className="balance-title">Your Balance</div>
-          <div className="balance-amount">${balance.toLocaleString()}</div>
-        </div>
+        {!currentUser ? (
+          <div className="bet-card" style={{ marginTop: 0 }}>
+            <h3>Login to Bet</h3>
+            <form className="login-form-side" onSubmit={handleLogin}>
+              <input 
+                placeholder="Username" 
+                value={loginData.username}
+                onChange={e => setLoginData({...loginData, username: e.target.value})}
+              />
+              <input 
+                type="password" 
+                placeholder="Password" 
+                value={loginData.password}
+                onChange={e => setLoginData({...loginData, password: e.target.value})}
+              />
+              <button type="submit" className="login-btn-side">Join Game</button>
+            </form>
+          </div>
+        ) : (
+          <div className="balance-box">
+            <div className="balance-name">{currentUser.username}</div>
+            <div className="balance-amount">${currentUser.balance.toLocaleString()}</div>
+            <button className="logout-btn-side" onClick={() => setCurrentUser(null)}>Logout / Switch Account</button>
+          </div>
+        )}
 
-        {!isEliminated && (
+        {currentUser && !isEliminated && (
           <div className="bet-card">
-            <h3>Place Bet on {selectedTarget.nameEn}</h3>
+            <h3 style={{fontSize: '0.9rem'}}>Bet on {selectedTarget.nameEn}</h3>
             <input 
               type="number" 
               className="bet-input" 
@@ -264,37 +291,16 @@ function App() {
         )}
 
         <div className="bet-history">
-          <div className="sidebar-header" style={{fontSize: '0.8rem', marginBottom: '10px'}}>BET HISTORY</div>
-          {bets.slice(0, 5).map(bet => (
-            <div key={bet.id} className={`history-item ${bet.settled ? (bet.won ? 'won' : 'lost') : ''}`}>
-              {bet.targetName}: ${bet.amount} on {bet.type.toUpperCase()}
-              {bet.settled && <span> - {bet.won ? 'WON' : 'LOST'}</span>}
+          <div className="sidebar-header" style={{fontSize: '0.7rem', opacity: 0.6, marginBottom: '10px'}}>GLOBAL BETS</div>
+          {globalBets.slice(0, 20).map(bet => (
+            <div key={bet.id} className="history-item-global">
+              <span className="history-username">{bet.username}</span> 
+              <span style={{color: '#888'}}> → </span>
+              <span className="history-amount">${bet.amount.toLocaleString()}</span> 
+              <span style={{color: '#888'}}> on </span>
+              <span className="history-target">{bet.targetName}</span>
             </div>
           ))}
-        </div>
-
-        <div className="admin-section">
-          {adminUser ? (
-            <div>
-              <p style={{fontSize: '0.7rem'}}>Logged in: {adminUser.username}</p>
-              <button className="login-btn" onClick={() => setAdminUser(null)}>Logout</button>
-            </div>
-          ) : (
-            <form className="login-form" onSubmit={handleLogin}>
-              <input 
-                placeholder="Username" 
-                value={loginData.username}
-                onChange={e => setLoginData({...loginData, username: e.target.value})}
-              />
-              <input 
-                type="password" 
-                placeholder="Password" 
-                value={loginData.password}
-                onChange={e => setLoginData({...loginData, password: e.target.value})}
-              />
-              <button className="login-btn" type="submit">Admin Login</button>
-            </form>
-          )}
         </div>
       </div>
 
@@ -305,7 +311,6 @@ function App() {
           </div>
         </div>
       )}
-
     </div>
   )
 }
