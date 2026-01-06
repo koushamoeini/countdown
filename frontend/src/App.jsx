@@ -1,11 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import './App.css'
 
 // To use backend later, add your Render URL here or in .env
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-import { useState, useEffect, useMemo } from 'react'
-import './App.css'
 
 const targets = [
   { id: 1, nameEn: 'Ali Khamenei', nameFa: 'خامنه ای', dead: false, fixedDate: 'February 11, 2026 00:00:00' },
