@@ -57,7 +57,8 @@ const targets = [
   { id: 50, nameEn: 'Ali Akbar Salehi', nameFa: 'علی‌اکبر صالحی', dead: false },
 ]
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+// قبلی را پاک کنید و این را بگذارید:
+const API_URL = 'https://mortezamirkoohi.pythonanywhere.com/api'
 
 function App() {
   const [selectedTarget, setSelectedTarget] = useState(targets[0])
