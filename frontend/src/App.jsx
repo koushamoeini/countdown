@@ -37,7 +37,7 @@ const targets = [
   { id: 30, nameEn: 'Masoud Pezeshkian', nameFa: 'مسعود پزشکیان', dead: false },
   { id: 31, nameEn: 'M. Mohseni-Ejei', nameFa: 'غلامحسین محسنی اژه‌ای', dead: false },
   { id: 32, nameEn: 'M. Bagher Ghalibaf', nameFa: 'محمدباقر قالیباف', dead: false },
-  { id: 33, nameEn: 'Saeed Jalili', nameFa: 'سعید جلیلی', dead: false },
+  { id: 33, nameEn: 'Saeed Jalili', nameFa: 'سید جلیلی', dead: false },
   { id: 34, nameEn: 'Ali Akbar Velayati', nameFa: 'علی‌اکبر ولایتی', dead: false },
   { id: 35, nameEn: 'Mahmoud Ahmadinejad', nameFa: 'محمود احمدی‌نژاد', dead: false },
   { id: 36, nameEn: 'Hassan Rouhani', nameFa: 'حسن روحانی', dead: false },
@@ -57,22 +57,41 @@ const targets = [
   { id: 50, nameEn: 'Ali Akbar Salehi', nameFa: 'علی‌اکبر صالحی', dead: false },
 ]
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
 function App() {
   const [selectedTarget, setSelectedTarget] = useState(targets[0])
-  const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('betUsers')) || {})
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')) || null)
-  const [globalBets, setGlobalBets] = useState(() => JSON.parse(localStorage.getItem('globalBets')) || [])
+  const [globalBets, setGlobalBets] = useState([])
   const [loginData, setLoginData] = useState({ username: '', password: '' })
-  const [resolvedStatus, setResolvedStatus] = useState(() => JSON.parse(localStorage.getItem('resolvedStatus')) || {})
+  const [resolvedStatus, setResolvedStatus] = useState({})
   const [betAmount, setBetAmount] = useState(100)
 
-  // Sync state to localStorage
+  // Fetch Global State (Bets & Outcomes)
+  const fetchState = async () => {
+    try {
+      const res = await fetch(`${API_URL}/state/`)
+      const data = await res.json()
+      setGlobalBets(data.history)
+      setResolvedStatus(data.statuses)
+      
+      // Update balance if logged in
+      if (currentUser) {
+        const userRes = await fetch(`${API_URL}/state/`, {
+          // In a real app we'd use tokens, but for now we'll just re-sync balance if user exists in context
+        })
+      }
+    } catch (err) {
+      console.error("Failed to fetch state", err)
+    }
+  }
+
+  // Poll for updates every 3 seconds
   useEffect(() => {
-    localStorage.setItem('betUsers', JSON.stringify(users))
-    localStorage.setItem('currentUser', JSON.stringify(currentUser))
-    localStorage.setItem('resolvedStatus', JSON.stringify(resolvedStatus))
-    localStorage.setItem('globalBets', JSON.stringify(globalBets))
-  }, [users, currentUser, resolvedStatus, globalBets])
+    fetchState()
+    const interval = setInterval(fetchState, 3000)
+    return () => clearInterval(interval)
+  }, [currentUser])
 
   // Get effective dead status
   const isTargetDead = (target) => {
@@ -93,60 +112,80 @@ function App() {
   // New Betting Deadline: 30 days from now (static for demo)
   const bettingDeadline = new Date('January 31, 2026 00:00:00').getTime()
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     const { username, password } = loginData
     if (!username || !password) return alert('Fill all fields')
 
-    const existingUser = users[username]
-    if (existingUser) {
-      if (existingUser.password === password) {
-        setCurrentUser({ username, ...existingUser })
+    try {
+      const res = await fetch(`${API_URL}/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setCurrentUser(data)
+        localStorage.setItem('currentUser', JSON.stringify(data))
       } else {
-        alert('Wrong password')
+        alert(data.error || 'Login failed')
       }
-    } else {
-      const newUser = { password, balance: 10000, bets: [] }
-      setUsers(prev => ({ ...prev, [username]: newUser }))
-      setCurrentUser({ username, ...newUser })
+    } catch (err) {
+      alert('Backend connection failed')
     }
     setLoginData({ username: '', password: '' })
   }
 
-  const handleBet = (type) => {
+  const handleBet = async (type) => {
     if (!currentUser) return alert('Please Login first')
     if (currentUser.balance < betAmount) return alert('Not enough money!')
     
-    const newBet = {
-      id: Date.now(),
-      username: currentUser.username,
-      targetId: selectedTarget.id,
-      targetName: selectedTarget.nameEn,
-      amount: betAmount,
-      type: type,
-      settled: false
+    try {
+      const res = await fetch(`${API_URL}/bet/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentUser.username,
+          targetId: selectedTarget.id,
+          targetName: selectedTarget.nameEn,
+          amount: betAmount,
+          type: type
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        const updatedUser = { ...currentUser, balance: data.balance }
+        setCurrentUser(updatedUser)
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser))
+        fetchState()
+      } else {
+        alert(data.error || 'Bet failed')
+      }
+    } catch (err) {
+      alert('Backend connection failed')
     }
-
-    // Update global feed
-    setGlobalBets(prev => [newBet, ...prev])
-
-    // Update user data
-    const updatedUserBets = [newBet, ...currentUser.bets]
-    const newBalance = currentUser.balance - betAmount
-    const updatedUser = { ...users[currentUser.username], balance: newBalance, bets: updatedUserBets }
-    
-    setUsers(prev => ({ ...prev, [currentUser.username]: updatedUser }))
-    setCurrentUser({ username: currentUser.username, ...updatedUser })
   }
 
-  const settleAllBets = (targetId, outcome) => {
-    setResolvedStatus(prev => ({ ...prev, [targetId]: outcome }))
-    
-    setUsers(allUsers => {
-      const updatedUsers = { ...allUsers }
-      Object.keys(updatedUsers).forEach(uname => {
-        let winTotal = 0
-        updatedUsers[uname].bets = updatedUsers[uname].bets.map(bet => {
+  const settleAllBets = async (targetId, outcome) => {
+    try {
+      const res = await fetch(`${API_URL}/settle/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin: 'kousha',
+          targetId: targetId,
+          outcome: outcome
+        })
+      })
+      if (res.ok) {
+        fetchState()
+        // Refresh to update balances for users
+        setTimeout(() => window.location.reload(), 500)
+      }
+    } catch (err) {
+      alert('Settlement failed')
+    }
+  }
           if (bet.targetId === targetId && !bet.settled) {
             const won = (bet.type === 'die' && outcome === true) || (bet.type === 'live' && outcome === false)
             const multiplier = bet.type === 'die' ? 10 : 1.6
@@ -270,7 +309,10 @@ function App() {
           <div className="balance-box">
             <div className="balance-name">{currentUser.username}</div>
             <div className="balance-amount">${currentUser.balance.toLocaleString()}</div>
-            <button className="logout-btn-side" onClick={() => setCurrentUser(null)}>Logout / Switch Account</button>
+            <button className="logout-btn-side" onClick={() => {
+              setCurrentUser(null)
+              localStorage.removeItem('currentUser')
+            }}>Logout / Switch Account</button>
           </div>
         )}
 
