@@ -38,7 +38,7 @@ function App() {
 
   return (
     <div className="App">
-      <h1 className="title-farsi">مانده به گاییده شدن مادر خامنه ای</h1>
+      <h1 className="title-farsi">مادرشو خیلی وقته گاییدن پس مانده به گاییده شدن خود خامنه ای</h1>
       <div className="countdown-container">
         <div className="countdown-item">
           <span className="count">{timeLeft.days}</span>
