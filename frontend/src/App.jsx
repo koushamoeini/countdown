@@ -5,7 +5,7 @@ import './App.css'
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
-  const targetDate = new Date('February 17, 2026 00:00:00').getTime()
+  const targetDate = new Date('February 11, 2026 00:00:00').getTime()
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft())
 
   function calculateTimeLeft() {
@@ -38,7 +38,6 @@ function App() {
 
   return (
     <div className="App">
-      <h1 className="title-farsi">مانده به گاییده شدن خامنه ای</h1>
       <div className="countdown-container">
         <div className="countdown-item">
           <span className="count">{timeLeft.days}</span>
@@ -57,6 +56,8 @@ function App() {
           <span className="label">Seconds</span>
         </div>
       </div>
+      <h1 className="title-farsi">مانده به گاییده شدن خامنه ای</h1>
+      <div className="creator-credit">Created by Soheil Elahi</div>
     </div>
   )
 }
