@@ -1,0 +1,1 @@
+web: gunicorn -C backend/config/wsgi.py backend.config.wsgi
