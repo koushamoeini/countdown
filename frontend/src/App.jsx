@@ -59,36 +59,63 @@ const targets = [
 
 function App() {
   const [selectedTarget, setSelectedTarget] = useState(targets[0])
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [balance, setBalance] = useState(() => Number(localStorage.getItem('balance')) || 10000)
+  const [bets, setBets] = useState(() => JSON.parse(localStorage.getItem('bets')) || [])
+  const [betAmount, setBetAmount] = useState(100)
+  const [adminUser, setAdminUser] = useState(() => JSON.parse(localStorage.getItem('adminUser')) || null)
+  const [loginData, setLoginData] = useState({ username: '', password: '' })
+  const [resolvedStatus, setResolvedStatus] = useState(() => JSON.parse(localStorage.getItem('resolvedStatus')) || {})
+
+  // Sync state to localStorage
+  useEffect(() => {
+    localStorage.setItem('balance', balance.toString())
+    localStorage.setItem('bets', JSON.stringify(bets))
+    localStorage.setItem('adminUser', JSON.stringify(adminUser))
+    localStorage.setItem('resolvedStatus', JSON.stringify(resolvedStatus))
+  }, [balance, bets, adminUser, resolvedStatus])
+
+  // Get effective dead status (original or admin override)
+  const isTargetDead = (target) => {
+    if (resolvedStatus[target.id] !== undefined) return resolvedStatus[target.id]
+    return target.dead
+  }
+
   // Storage for random deadlines so they remain consistent for the session
   const deadlines = useMemo(() => {
     const map = {}
-    const now = new Date().getTime()
+    // We use a FIXED reference date instead of "now" to ensure consistency across refreshes
+    const baseDate = new Date('January 1, 2026 00:00:00').getTime()
     const maxDate = new Date('February 11, 2026 00:00:00').getTime()
     const minDiff = 2 * 24 * 60 * 60 * 1000 // 2 days
 
     targets.forEach(t => {
-      if (t.dead) {
-        map[t.id] = now - 1000 // Already passed
+      const isDead = isTargetDead(t)
+      if (isDead) {
+        map[t.id] = baseDate - 1000 // Already passed relative to reference
       } else if (t.fixedDate) {
         map[t.id] = new Date(t.fixedDate).getTime()
       } else {
-        // Random date between 2 days from now and Feb 11
-        const range = maxDate - (now + minDiff)
-        map[t.id] = now + minDiff + Math.random() * range
+        // Deterministic random date based on ID and the fixed baseDate
+        const seed = t.id * 86421
+        const pseudoRandom = (Math.sin(seed) + 1) / 2
+        const range = maxDate - (baseDate + minDiff)
+        map[t.id] = baseDate + minDiff + (pseudoRandom * range)
       }
     })
     return map
-  }, [])
+  }, [resolvedStatus])
 
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
 
   useEffect(() => {
     function calculateTimeLeft() {
       const now = new Date().getTime()
-      const difference = deadlines[selectedTarget.id] - now
+      const deadline = deadlines[selectedTarget.id]
+      const difference = deadline - now
+      const isDead = isTargetDead(selectedTarget)
 
-      if (difference > 0 && !selectedTarget.dead) {
+      if (difference > 0 && !isDead) {
         return {
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
@@ -103,27 +130,86 @@ function App() {
       setTimeLeft(calculateTimeLeft())
     }, 1000)
 
-    setTimeLeft(calculateTimeLeft()) // Initial call
-
+    setTimeLeft(calculateTimeLeft())
     return () => clearInterval(timer)
-  }, [selectedTarget, deadlines])
+  }, [selectedTarget, deadlines, resolvedStatus])
 
-  const isEliminated = selectedTarget.dead || (deadlines[selectedTarget.id] <= new Date().getTime())
+  const handleBet = (type) => {
+    if (balance < betAmount) return alert('Not enough money!')
+    if (betAmount <= 0) return alert('Invalid amount')
+    
+    const newBet = {
+      id: Date.now(),
+      targetId: selectedTarget.id,
+      targetName: selectedTarget.nameEn,
+      amount: betAmount,
+      type: type, // 'die' or 'live'
+      settled: false
+    }
+
+    setBalance(prev => prev - betAmount)
+    setBets(prev => [newBet, ...prev])
+  }
+
+  const handleLogin = (e) => {
+    e.preventDefault()
+    if (loginData.username === 'kousha' && loginData.password === '1234') {
+      setAdminUser({ username: 'kousha' })
+      setLoginData({ username: '', password: '' })
+    } else {
+      alert('Wrong credentials')
+    }
+  }
+
+  const settleAllBets = (targetId, outcome) => {
+    // outcome: true (dead) or false (alive)
+    setResolvedStatus(prev => ({ ...prev, [targetId]: outcome }))
+    
+    setBets(currentBets => {
+      let winTotal = 0
+      const updated = currentBets.map(bet => {
+        if (bet.targetId === targetId && !bet.settled) {
+          const won = (bet.type === 'die' && outcome === true) || (bet.type === 'live' && outcome === false)
+          const multiplier = bet.type === 'die' ? 10 : 1.6
+          if (won) {
+            winTotal += bet.amount * multiplier
+          }
+          return { ...bet, settled: true, won }
+        }
+        return bet
+      })
+      if (winTotal > 0) setBalance(prev => prev + winTotal)
+      return updated
+    })
+  }
+
+  const isEliminated = isTargetDead(selectedTarget) || (deadlines[selectedTarget.id] <= new Date().getTime())
 
   return (
     <div className="App">
       <div className="sidebar">
         <div className="sidebar-header">TARGETS</div>
-        {targets.map(t => (
-          <button 
-            key={t.id} 
-            className={`target-btn ${selectedTarget.id === t.id ? 'active' : ''} ${t.dead ? 'dead' : ''}`}
-            onClick={() => setSelectedTarget(t)}
-          >
-            {t.nameEn}
-            {t.dead && <span className="status-tag">DONE</span>}
-          </button>
-        ))}
+        <div className="targets-list">
+          {targets.map(t => {
+            const dead = isTargetDead(t)
+            const countdownEnded = deadlines[t.id] <= new Date().getTime()
+            const eliminated = dead || countdownEnded
+            
+            return (
+              <button 
+                key={t.id} 
+                className={`target-btn ${selectedTarget.id === t.id ? 'active' : ''} ${eliminated ? 'dead' : ''}`}
+                onClick={() => setSelectedTarget(t)}
+              >
+                <span className="target-name">{t.nameEn}</span>
+                {eliminated && <span className="status-tag">DONE</span>}
+              </button>
+            )
+          })}
+        </div>
+        <div className="creator-credit-sidebar">
+          <span className="credit-text">Created by Soheil Elahi</span>
+        </div>
       </div>
 
       <div className="main-content">
@@ -146,6 +232,70 @@ function App() {
           </div>
         </div>
         <h1 className="title-farsi">مانده به گاییده شدن {selectedTarget.nameFa}</h1>
+        
+        {adminUser && (
+          <div style={{ marginTop: '2rem', display: 'flex', gap: '10px' }}>
+            <button className="settle-btn" onClick={() => settleAllBets(selectedTarget.id, true)}>Confirm DEAD</button>
+            <button className="settle-btn" style={{background: '#4caf50'}} onClick={() => settleAllBets(selectedTarget.id, false)}>Confirm ALIVE</button>
+          </div>
+        )}
+      </div>
+
+      <div className="betting-sidebar">
+        <div className="balance-box">
+          <div className="balance-title">Your Balance</div>
+          <div className="balance-amount">${balance.toLocaleString()}</div>
+        </div>
+
+        {!isEliminated && (
+          <div className="bet-card">
+            <h3>Place Bet on {selectedTarget.nameEn}</h3>
+            <input 
+              type="number" 
+              className="bet-input" 
+              value={betAmount} 
+              onChange={(e) => setBetAmount(Number(e.target.value))}
+            />
+            <div className="bet-btn-group">
+              <button className="bet-btn btn-die" onClick={() => handleBet('die')}>DIE (10x)</button>
+              <button className="bet-btn btn-live" onClick={() => handleBet('live')}>LIVE (1.6x)</button>
+            </div>
+          </div>
+        )}
+
+        <div className="bet-history">
+          <div className="sidebar-header" style={{fontSize: '0.8rem', marginBottom: '10px'}}>BET HISTORY</div>
+          {bets.slice(0, 5).map(bet => (
+            <div key={bet.id} className={`history-item ${bet.settled ? (bet.won ? 'won' : 'lost') : ''}`}>
+              {bet.targetName}: ${bet.amount} on {bet.type.toUpperCase()}
+              {bet.settled && <span> - {bet.won ? 'WON' : 'LOST'}</span>}
+            </div>
+          ))}
+        </div>
+
+        <div className="admin-section">
+          {adminUser ? (
+            <div>
+              <p style={{fontSize: '0.7rem'}}>Logged in: {adminUser.username}</p>
+              <button className="login-btn" onClick={() => setAdminUser(null)}>Logout</button>
+            </div>
+          ) : (
+            <form className="login-form" onSubmit={handleLogin}>
+              <input 
+                placeholder="Username" 
+                value={loginData.username}
+                onChange={e => setLoginData({...loginData, username: e.target.value})}
+              />
+              <input 
+                type="password" 
+                placeholder="Password" 
+                value={loginData.password}
+                onChange={e => setLoginData({...loginData, password: e.target.value})}
+              />
+              <button className="login-btn" type="submit">Admin Login</button>
+            </form>
+          )}
+        </div>
       </div>
 
       {isEliminated && (
@@ -156,7 +306,6 @@ function App() {
         </div>
       )}
 
-      <div className="creator-credit">Created by Soheil Elahi</div>
     </div>
   )
 }
